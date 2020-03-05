@@ -99,8 +99,10 @@ public class StoreSCP {
                 Attributes rq, PDVInputStream data, Attributes rsp)
                 throws IOException {
             rsp.setInt(Tag.Status, VR.US, status);
-            if (storageDir == null)
+            if (storageDir == null) {
+                data.skipAll();
                 return;
+            }
 
             String cuid = rq.getString(Tag.AffectedSOPClassUID);
             String iuid = rq.getString(Tag.AffectedSOPInstanceUID);
