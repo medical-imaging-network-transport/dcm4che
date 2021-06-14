@@ -39,7 +39,9 @@
 package org.dcm4che3.imageio.stream;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageInputStreamImpl;
@@ -84,21 +86,57 @@ public class SegmentedImageInputStream extends ImageInputStreamImpl {
 
     public static SegmentedImageInputStream ofFrame(ImageInputStream iis, Fragments fragments, int index, int frames)
             throws IOException {
-        if (frames > 1) {
-            if (fragments.size() != frames +1)
-                throw new UnsupportedOperationException(
-                        "Number of Fragments [" + fragments.size()
-                                + "] != Number of Frames [" + frames + "] + 1");
+        if (fragments.size() < frames + 1) {
+            // We don't know the transfer syntax, so we just have to trust that we've previously confirmed that this
+            // transfer syntax supports multi-fragment frames if we have more fragments than (frames+1).
+            throw new UnsupportedOperationException(
+                    "Number of Fragments [" + fragments.size()
+                            + "] != Number of Frames [" + frames + "] + 1");
+        }
+        if (fragments.size() == frames + 1) {
+            // We have exactly one fragment for each frame.
             BulkData bulkData = (BulkData) fragments.get(index+1);
             return new SegmentedImageInputStream(iis, bulkData.offset(), bulkData.length(), false);
         }
+        /*
+            At least one frame has multiple fragments. We try to figure out the offsets bounding this frame, then
+            get the fragments within those offsets.
+            If this is the only frame, the offsetTable may (and likely will) be empty -- in this case all fragments
+            will be used.
+            If there is more than one frame, we use the offsetTable to figure out the first (and last, if it's not the
+            last frame) fragment of the frame.
+         */
+        int startOffset = 0;
+        int endOffset = -1;
         int n = fragments.size() - 1;
-        long[] offsets = new long[n];
-        int[] lengths = new int[n];
+        BulkData offsetTable = (BulkData) fragments.get(0);
+
+        if (offsetTable.length() > 0) {
+            byte[] tableData = offsetTable.toBytes(null, offsetTable.bigEndian());
+            startOffset = ByteUtils.bytesToInt(tableData, index * 4, offsetTable.bigEndian());
+            if (index < frames - 1) {
+                endOffset = ByteUtils.bytesToInt(tableData, (index + 1) * 4, offsetTable.bigEndian());
+            }
+        }
+
+        List<Long> offsetList = new ArrayList<Long>();
+        List<Integer> lengthList = new ArrayList<Integer>();
         for (int i = 0; i < n; i++) {
             BulkData bulkData = (BulkData) fragments.get(i+1);
-            offsets[i] = bulkData.offset();
-            lengths[i] = bulkData.length();
+            if (endOffset > 0 && bulkData.offset() >= endOffset) {
+                break;
+            }
+            if (bulkData.offset() >= startOffset) {
+                offsetList.add(bulkData.offset());
+                lengthList.add(bulkData.length());
+            }
+        }
+
+        long[] offsets = new long[offsetList.size()];
+        int[] lengths = new int[lengthList.size()];
+        for (int i = 0; i < offsetList.size(); i++) {
+            offsets[i] = offsetList.get(i);
+            lengths[i] = lengthList.get(i);
         }
         return new SegmentedImageInputStream(iis, offsets, lengths);
     }
