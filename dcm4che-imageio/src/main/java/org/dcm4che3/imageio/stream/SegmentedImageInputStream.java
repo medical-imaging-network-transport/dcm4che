@@ -103,11 +103,12 @@ public class SegmentedImageInputStream extends ImageInputStreamImpl {
             get the fragments within those offsets.
             If this is the only frame, the offsetTable may (and likely will) be empty -- in this case all fragments
             will be used.
-            If there is more than one frame, we use the offsetTable to figure out the first (and last, if it's not the
-            last frame) fragment of the frame.
+            If there is more than one frame, we need to use the offsetTable to determine which fragments are part of
+            this frame.
          */
         int startOffset = 0;
         int endOffset = -1;
+        int offsetAdjust = 0;
         int n = fragments.size() - 1;
         BulkData offsetTable = (BulkData) fragments.get(0);
 
@@ -117,16 +118,23 @@ public class SegmentedImageInputStream extends ImageInputStreamImpl {
             if (index < frames - 1) {
                 endOffset = ByteUtils.bytesToInt(tableData, (index + 1) * 4, offsetTable.bigEndian());
             }
+            offsetAdjust = offsetTable.length();
         }
 
         List<Long> offsetList = new ArrayList<Long>();
         List<Integer> lengthList = new ArrayList<Integer>();
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++, offsetAdjust -= 8) {
+            /*
+                The offset table is based on the raw bytes of the DICOM (7FE0,0010) pixel data, while the fragment
+                offsets are based only on the concatenated contents of the (FFFE,E000) tags.
+                The adjustment starts at the length of the offset table (as a zero offset here corresponds to the first
+                byte following the table), and shrinks by 8 (FEFF00E0 + the length short) with each fragment.
+             */
             BulkData bulkData = (BulkData) fragments.get(i+1);
-            if (endOffset > 0 && bulkData.offset() >= endOffset) {
+            if (endOffset > 0 && bulkData.offset() >= (endOffset + offsetAdjust)) {
                 break;
             }
-            if (bulkData.offset() >= startOffset) {
+            if (bulkData.offset() >= (startOffset + offsetAdjust)) {
                 offsetList.add(bulkData.offset());
                 lengthList.add(bulkData.length());
             }
@@ -138,6 +146,7 @@ public class SegmentedImageInputStream extends ImageInputStreamImpl {
             offsets[i] = offsetList.get(i);
             lengths[i] = lengthList.get(i);
         }
+
         return new SegmentedImageInputStream(iis, offsets, lengths);
     }
 
