@@ -105,7 +105,7 @@ public class Decompressor {
             this.pixeldataFragments = (Fragments) pixeldata;
 
             int numFragments = pixeldataFragments.size();
-            if (isMultiFragmentFrameSupported()){
+            if (isMultiFragmentFrameSupported()) {
                 if (numFragments < frames + 1) {
                     throw new IllegalArgumentException(
                             "Number of Pixel Data Fragments: "
@@ -115,7 +115,6 @@ public class Decompressor {
                 throw new IllegalArgumentException(
                         "Number of Pixel Data Fragments: "
                         + numFragments + " does not match " + frames);
-                }
             }
 
             this.file = ((BulkData) pixeldataFragments.get(1)).getFile();
