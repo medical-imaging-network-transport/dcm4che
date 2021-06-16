@@ -111,11 +111,10 @@ public class Decompressor {
                             "Number of Pixel Data Fragments: "
                             + numFragments + " does not match or exceed " + frames);
                 }
-            } else {
-                if (numFragments != frames + 1) {
-                    throw new IllegalArgumentException(
-                            "Number of Pixel Data Fragments: "
-                            + numFragments + " does not match " + frames);
+            } else if (numFragments != frames + 1) {
+                throw new IllegalArgumentException(
+                        "Number of Pixel Data Fragments: "
+                        + numFragments + " does not match " + frames);
                 }
             }
 
