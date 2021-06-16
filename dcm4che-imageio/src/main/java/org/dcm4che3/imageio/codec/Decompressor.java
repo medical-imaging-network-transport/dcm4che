@@ -105,11 +105,18 @@ public class Decompressor {
             this.pixeldataFragments = (Fragments) pixeldata;
 
             int numFragments = pixeldataFragments.size();
-            if (frames == 1 ? (numFragments < 2)
-                            : (numFragments != frames + 1))
+            if (isMultiFragmentFrameSupported()){
+                if (numFragments < frames + 1) {
+                    throw new IllegalArgumentException(
+                            "Number of Pixel Data Fragments: "
+                            + numFragments + " does not match or exceed " + frames);
+                }
+            } else if (numFragments != frames + 1) {
                 throw new IllegalArgumentException(
                         "Number of Pixel Data Fragments: "
                         + numFragments + " does not match " + frames);
+                }
+            }
 
             this.file = ((BulkData) pixeldataFragments.get(1)).getFile();
             ImageReaderFactory.ImageReaderParam param =
@@ -222,4 +229,15 @@ public class Decompressor {
         return bi;
     }
 
+    private boolean isMultiFragmentFrameSupported() {
+        switch (tsType) {
+            case JPEG_BASELINE:
+            case JPEG_EXTENDED:
+            case JPEG_LOSSLESS:
+            case JPEG_2000:
+            case JPEG_2000_LOSSLESS:
+                return true;
+        }
+        return false;
+    }
 }
